@@ -3,6 +3,8 @@ import argparse
 import sys
 
 import gym
+import numpy
+from matplotlib import pyplot
 from gym import wrappers, logger
 
 class RandomAgent(object):
@@ -38,6 +40,10 @@ if __name__ == '__main__':
     reward = 0
     done = False
 
+    rewardPerEp = numpy.array([])
+    ep = numpy.array([])
+    interaction = numpy.array([])
+
     for i in range(episode_count):
         ob = env.reset()
         nbInteraction = 0
@@ -48,11 +54,26 @@ if __name__ == '__main__':
             ob, reward, done, _ = env.step(action)
             sumReward += reward
             if done:
+                rewardPerEp = numpy.append(rewardPerEp, sumReward)
+                ep = numpy.append(ep, i)
+                interaction = numpy.append(interaction, nbInteraction)
                 print("Episode " + str(i) + " : " + str(sumReward) + " in " + str(nbInteraction) + ".")
                 break
             # Note there's no env.render() here. But the environment still can open window and
             # render if asked by env.monitor: it calls env.render('rgb_array') to record video.
             # Video is not recorded every episode, see capped_cubic_video_schedule for details.
+    
+    pyplot.plot(ep, rewardPerEp)
+    pyplot.gca().set_ylabel("Récompense totale")
+    pyplot.gca().set_xlabel("Épisode")
+    pyplot.title("Récompense totale par épisode")
+    pyplot.show()
+
+    pyplot.plot(interaction, rewardPerEp)
+    pyplot.gca().set_ylabel("Récompense totale")
+    pyplot.gca().set_xlabel("Nb Interaction")
+    pyplot.title("Récompense totale par rapport au nombre d'interaction")
+    pyplot.show()
 
     # Close the env and write monitor result info to disk
     env.close()
