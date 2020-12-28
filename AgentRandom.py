@@ -59,7 +59,9 @@ class RandomAgent(object):
         self.target_net.eval()
 
         prediction = self.net(states).gather(1, actions)
-        next_labels = self.net(next_states).max(1)[0].detach().unsqueeze(1)
+
+        with torch.no_grad():
+            next_labels = self.target_net(next_states).detach().max(1)[0].unsqueeze(1)
 
         # Bellman's equation
         labels = rewards + (gamma * next_labels * (1 - endsOfEp))
