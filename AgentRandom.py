@@ -61,7 +61,7 @@ class RandomAgent(object):
         prediction = self.net(states).gather(1, actions)
 
         with torch.no_grad():
-            next_labels = self.target_net(next_states).detach().max(1)[0].unsqueeze(1)
+            next_labels = self.target_net(next_states).max(1)[0].unsqueeze(1)
 
         # Bellman's equation
         labels = rewards + (gamma * next_labels * (1 - endsOfEp))
@@ -69,11 +69,9 @@ class RandomAgent(object):
         loss = loss_func(prediction, labels)
         self.optimizer.zero_grad()
         loss.backward()
-        for param in self.net.parameters():
-            param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
 
-        if self.steps_done % 10000 == 0:
+        if self.steps_done % 5000 == 0:
             self.update_target()
     
     def update_target(self):
