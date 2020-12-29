@@ -16,7 +16,6 @@ class Network(torch.nn.Module):
                                               bias=True))
                 linear.append(self.fun())
             linear.append(torch.nn.Linear(h_tab[-1], d_out, bias=True))
-            linear.append(torch.nn.Softmax(dim=1))
         self.param = torch.nn.ModuleList(linear)
 
     def forward(self, x_v):

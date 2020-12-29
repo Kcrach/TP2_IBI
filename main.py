@@ -13,10 +13,11 @@ from AgentRandom import RandomAgent
 if __name__ == '__main__':
     # Hyper-parameters
     eta = 0.0001
-    batch_size = 128
-    EPS_START = 0.9
-    EPS_END = 0.05
-    EPS_DECAY = 200
+    batch_size = 64
+    gamma = 0.999
+    eps_start = 0.9
+    eps_end = 0.05
+    eps_decay = 200
 
     parser = argparse.ArgumentParser(description=None)
     # Question 1
@@ -49,16 +50,15 @@ if __name__ == '__main__':
     interaction = numpy.array([])
 
     for i in range(episode_count):
-        if i % 100 == 0:
-            print("Episode : " + str(i))
         ob = env.reset()
         nbInteraction = 0
         sumReward = 0
+
         while True:
             nbInteraction += 1
             # State before that the agent do the action
             actualState = ob
-            action = agent.act(ob, EPS_END, EPS_START, EPS_DECAY)
+            action = agent.act(ob, eps_end, eps_start, eps_decay)
 
             ob, reward, done, _ = env.step(action)
             sumReward += reward
@@ -67,10 +67,10 @@ if __name__ == '__main__':
             mem.pushMemory(actualState, action, ob, reward, done)
 
             # Verify that the size of the sample is inferior than the size of the memory
-            if (batch_size <= len(mem.memoryReplay)):
+            if batch_size <= len(mem.memoryReplay):
                 # After we can learn
                 sample_exp = mem.sampling(batch_size)
-                agent.learn(sample_exp, 0.999)
+                agent.learn(sample_exp,gamma)
 
             if done:
                 # Data to draw graphics

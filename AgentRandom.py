@@ -11,15 +11,15 @@ class RandomAgent(object):
         self.eta = eta
         self.steps_done = 0
 
-        self.net = Network(ob_space.shape[0], [16, 32 , 16], action_space.n)
-        self.target_net = Network(ob_space.shape[0], [16, 32 , 16], action_space.n)
+        self.net = Network(ob_space.shape[0], [64, 64], action_space.n)
+        self.target_net = Network(ob_space.shape[0], [64, 64], action_space.n)
 
         self.optimizer = torch.optim.Adam(self.net.parameters(), lr=eta)
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def act(self, observation, EPS_END, EPS_START, EPS_DECAY):
-        eps_threshold = EPS_END + (EPS_START - EPS_END) * math.exp(-1. * self.steps_done / EPS_DECAY)
+    def act(self, observation, eps_end, eps_start, eps_decay):
+        eps_threshold = eps_end + (eps_start - eps_end) * math.exp(-1. * self.steps_done / eps_decay)
         self.steps_done += 1
         # Convert to tensor
         ob = torch.from_numpy(observation).float().unsqueeze(0).to(self.device)
@@ -41,7 +41,7 @@ class RandomAgent(object):
             # Do best action
             return int(torch.argmax(qval))
         else:
-            # Do random action : choose action in [0, |action_space|]
+            # Do random action : choose action in [0, 1, ..., |action_space|] 
             return random.choice(numpy.arange(self.action_space.n))
 
     def learn(self, sample_exp, gamma):
@@ -71,7 +71,7 @@ class RandomAgent(object):
         loss.backward()
         self.optimizer.step()
 
-        if self.steps_done % 5000 == 0:
+        if self.steps_done % 500 == 0:
             self.update_target()
     
     def update_target(self):
