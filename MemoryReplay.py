@@ -17,6 +17,6 @@ class Memory(object):
         # Add last interaction into buffer
         self.memoryReplay.append(Interaction(state, action, nextState, reward, endOfEp))
     
-    def sampling(self, size):
+    def sample(self, size):
         # Return a batch of random data into the buffer, batch of size "size"
         return random.sample(self.memoryReplay, size)

@@ -12,12 +12,13 @@ from AgentRandom import RandomAgent
 
 if __name__ == '__main__':
     # Hyper-parameters
-    eta = 0.0001
+    eta = 0.0005
     batch_size = 64
     gamma = 0.999
-    eps_start = 0.9
-    eps_end = 0.05
-    eps_decay = 200
+    epsilon_start = 1
+    epsilon_end = 0.05
+    epsilon_decay = 0.998
+    update_freq = 200
 
     parser = argparse.ArgumentParser(description=None)
     # Question 1
@@ -41,7 +42,7 @@ if __name__ == '__main__':
 
     mem = Memory()
 
-    episode_count = 100
+    episode_count = 300
     reward = 0
     done = False
 
@@ -50,27 +51,28 @@ if __name__ == '__main__':
     interaction = numpy.array([])
 
     for i in range(episode_count):
-        ob = env.reset()
+        actual_state = env.reset()
         nbInteraction = 0
         sumReward = 0
 
         while True:
             nbInteraction += 1
-            # State before that the agent do the action
-            actualState = ob
-            action = agent.act(ob, eps_end, eps_start, eps_decay)
+            # Choose the action to do
+            action = agent.act(actual_state, epsilon_start)
 
-            ob, reward, done, _ = env.step(action)
+            # Calculate next state, reward and if the episode is finished or not
+            next_state, reward, done, _ = env.step(action)
             sumReward += reward
                 
             # Add the interaction in memory
-            mem.pushMemory(actualState, action, ob, reward, done)
+            mem.pushMemory(actual_state, action, next_state, reward, done)
+            actual_state = next_state
 
             # Verify that the size of the sample is inferior than the size of the memory
             if batch_size <= len(mem.memoryReplay):
                 # After we can learn
-                sample_exp = mem.sampling(batch_size)
-                agent.learn(sample_exp,gamma)
+                sample_exp = mem.sample(batch_size)
+                agent.opti_model(sample_exp, gamma, update_freq)
 
             if done:
                 # Data to draw graphics
@@ -79,6 +81,11 @@ if __name__ == '__main__':
 
                 interaction = numpy.append(interaction, nbInteraction)
                 break
+
+            # Decrease the epsilon, at the beginning, the epsilon is high, so the agent will diversify its actions
+            # But at the end, the epsilon is low, so the agent will intensify.
+            if epsilon_start > epsilon_end :
+                epsilon_start *= epsilon_decay
 
             # Note there's no env.render() here. But the environment still can open window and
             # render if asked by env.monitor: it calls env.render('rgb_array') to record video.
