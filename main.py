@@ -4,14 +4,27 @@ import sys
 
 import gym
 import numpy
+import vizdoomgym
+import skimage.transform
+import skimage.color
 from matplotlib import pyplot
 from gym import wrappers, logger
 import torch
 from MemoryReplay import Memory
 from AgentRandom import RandomAgent
+from AgentVizdoom import VizdoomAgent
+#from gym.wrappers import FrameStack
+
+def preprocess(img, reso):
+    img = skimage.transform.resize(img, reso)
+    img = skimage.color.rgb2gray(img)
+    img = img.astype(numpy.float32)
+    img = img.reshape([1, 1, int(reso[0]), int(reso[1])])
+    return img
 
 if __name__ == '__main__':
     # Hyper-parameters
+    environment_used = "VizdoomBasic-v0" #|| "CartPole-v1"
     eta = 0.0005
     batch_size = 64
     gamma = 0.999
@@ -20,11 +33,20 @@ if __name__ == '__main__':
     epsilon_decay = 0.998
     update_freq = 200
 
+    # CNN
+    resolution = [112, 64]
+    k_size = 5
+    stride = 2
+
     parser = argparse.ArgumentParser(description=None)
     # Question 1
-    parser.add_argument('env_id', nargs='?', default='CartPole-v1', help='Select the environment to run')
+    # Change the var called environment_used to change the environment
+    parser.add_argument('env_id', nargs='?', default=environment_used, help='Select the environment to run')
+    if environment_used == "VizdoomBasic-v0":
+        parser.add_argument('depth', nargs='?', default=True)
+        parser.add_argument('labels', nargs='?', default=True)
     args = parser.parse_args()
-
+    
     # You can set the level to logger.DEBUG or logger.WARN if you
     # want to change the amount of output.
     logger.set_level(logger.INFO)
@@ -38,7 +60,11 @@ if __name__ == '__main__':
     outdir = '/tmp/random-agent-results'
     env = wrappers.Monitor(env, directory=outdir, force=True)
     env.seed(0)
-    agent = RandomAgent(env.action_space, env.observation_space, eta)
+
+    if environment_used == "VizdoomBasic-v0":
+        agent = VizdoomAgent(env.action_space, resolution , eta)
+    else:
+        agent = RandomAgent(env.action_space, env.observation_space, eta)
 
     mem = Memory()
 
@@ -51,7 +77,12 @@ if __name__ == '__main__':
     interaction = numpy.array([])
 
     for i in range(episode_count):
-        actual_state = env.reset()
+        env.reset()
+        # Preprocess for CNN
+        if environment_used == "VizdoomBasic-v0":
+            actual_state, reward, done, info = env.step(env.action_space.sample())
+            actual_state=preprocess(actual_state[0], resolution) 
+
         nbInteraction = 0
         sumReward = 0
 
@@ -62,6 +93,10 @@ if __name__ == '__main__':
 
             # Calculate next state, reward and if the episode is finished or not
             next_state, reward, done, _ = env.step(action)
+
+            if environment_used == "VizdoomBasic-v0":
+                next_state = preprocess(next_state[0], resolution)
+
             sumReward += reward
                 
             # Add the interaction in memory

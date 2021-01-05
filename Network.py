@@ -22,3 +22,33 @@ class Network(torch.nn.Module):
         for f in self.param:
             x_v = f(x_v)
         return x_v
+
+class CNN(torch.nn.Module):
+    def __init__(self, reso, d_out):
+        super(CNN, self).__init__()
+        self.c1 = torch.nn.Conv2d(1, 16, kernel_size=5, stride=2)
+        self.n1 = torch.nn.BatchNorm2d(16)
+        self.c2 = torch.nn.Conv2d(16, 32, kernel_size=5, stride=2)
+        self.n2 = torch.nn.BatchNorm2d(32)
+        self.c3 = torch.nn.Conv2d(32, 32, kernel_size=3, stride=1)
+        self.n3 = torch.nn.BatchNorm2d(32)
+
+        output_width = self.calc_output_size(reso[0], 5, 2)
+        output_width = self.calc_output_size(output_width, 5, 2)
+        output_width = self.calc_output_size(output_width, 3, 1)
+
+        output_height = self.calc_output_size(reso[1], 5, 2)
+        output_height = self.calc_output_size(output_height, 5, 2)
+        output_height = self.calc_output_size(output_height, 3, 1)
+
+        print(int(output_height) * int(output_width) * 32)
+        self.l1 = torch.nn.Linear(int((int(output_height) * int(output_width) * 32)), d_out)
+
+    def forward(self, x_v):
+        x_v = torch.nn.functional.relu(self.n1(self.c1(x_v)))
+        x_v = torch.nn.functional.relu(self.n2(self.c2(x_v)))
+        x_v = torch.nn.functional.relu(self.n3(self.c3(x_v)))
+        return self.l1(x_v.view(x_v.size(0), -1))
+
+    def calc_output_size(self, size, k, s):
+        return (size - (k - 1) - 1) // s + 1
