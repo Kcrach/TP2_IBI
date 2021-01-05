@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     mem = Memory()
 
-    episode_count = 200
+    episode_count = 50
     reward = 0
     done = False
 
@@ -123,8 +123,8 @@ if __name__ == '__main__':
             # Video is not recorded every episode, see capped_cubic_video_schedule for details.
     
     # Save weights of the network used, decomment to save a new Neural Net
-    if test_mode == False:
-        torch.save(agent.net.state_dict(), "net/" + environment_used + ".pt")
+    #if test_mode == False:
+    #    torch.save(agent.net.state_dict(), "net/" + environment_used + ".pt")
 
     # Graphic reward per episode / episode
     pyplot.plot(ep, rewardPerEp)
