@@ -7,7 +7,7 @@ Interaction = namedtuple('Interaction',
 
 class Memory(object):
     def __init__(self):
-        self.capacity = 100000
+        self.capacity = 10000
         self.memoryReplay = []
     
     def pushMemory(self, state, action, nextState, reward, endOfEp):

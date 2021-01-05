@@ -13,38 +13,32 @@ import torch
 from MemoryReplay import Memory
 from AgentRandom import RandomAgent
 from AgentVizdoom import VizdoomAgent
-#from gym.wrappers import FrameStack
-
-def preprocess(img, reso):
-    img = skimage.transform.resize(img, reso)
-    img = skimage.color.rgb2gray(img)
-    img = img.astype(numpy.float32)
-    img = img.reshape([1, 1, int(reso[0]), int(reso[1])])
-    return img
+from gym.wrappers import FrameStack, ResizeObservation, GrayScaleObservation
 
 if __name__ == '__main__':
     # Hyper-parameters
-    environment_used = "VizdoomBasic-v0" #|| "CartPole-v1"
-    eta = 0.0005
-    batch_size = 64
-    gamma = 0.999
+    environment_used =  "VizdoomCorridor-v0" # || "CartPole-v1" "VizdoomBasic-v0"
+    eta = 0.001 # || 0.01 || 0.0001
+    batch_size = 32 # || 256 || 128 || 64 || 2
+    gamma = 0.999 # || 0.2 || 0.9
     epsilon_start = 1
     epsilon_end = 0.05
     epsilon_decay = 0.998
-    update_freq = 200
+    update_freq = 500
 
     # CNN
     resolution = [112, 64]
-    k_size = 5
-    stride = 2
+
+    # Test mode : Switch to True to test the learning (without training)
+    test_mode = False
+    if test_mode:
+        # When we test, we intensify
+        epsilon_start = 0.0
 
     parser = argparse.ArgumentParser(description=None)
     # Question 1
     # Change the var called environment_used to change the environment
     parser.add_argument('env_id', nargs='?', default=environment_used, help='Select the environment to run')
-    if environment_used == "VizdoomBasic-v0":
-        parser.add_argument('depth', nargs='?', default=True)
-        parser.add_argument('labels', nargs='?', default=True)
     args = parser.parse_args()
     
     # You can set the level to logger.DEBUG or logger.WARN if you
@@ -52,6 +46,14 @@ if __name__ == '__main__':
     logger.set_level(logger.INFO)
 
     env = gym.make(args.env_id)
+
+    if environment_used != "CartPole-v1":
+        env = GrayScaleObservation(env)
+        env = ResizeObservation(env, resolution)
+        env = FrameStack(env, 4)
+        agent = VizdoomAgent(env.action_space, resolution , eta, test_mode, environment_used)
+    else:
+        agent = RandomAgent(env.action_space, env.observation_space, eta, test_mode, environment_used)
 
     # You provide the directory to write to (can be an existing
     # directory, including one with existing data -- all monitor files
@@ -61,14 +63,9 @@ if __name__ == '__main__':
     env = wrappers.Monitor(env, directory=outdir, force=True)
     env.seed(0)
 
-    if environment_used == "VizdoomBasic-v0":
-        agent = VizdoomAgent(env.action_space, resolution , eta)
-    else:
-        agent = RandomAgent(env.action_space, env.observation_space, eta)
-
     mem = Memory()
 
-    episode_count = 300
+    episode_count = 200
     reward = 0
     done = False
 
@@ -78,10 +75,7 @@ if __name__ == '__main__':
 
     for i in range(episode_count):
         env.reset()
-        # Preprocess for CNN
-        if environment_used == "VizdoomBasic-v0":
-            actual_state, reward, done, info = env.step(env.action_space.sample())
-            actual_state=preprocess(actual_state[0], resolution) 
+        actual_state, reward, done, info = env.step(env.action_space.sample())
 
         nbInteraction = 0
         sumReward = 0
@@ -94,20 +88,27 @@ if __name__ == '__main__':
             # Calculate next state, reward and if the episode is finished or not
             next_state, reward, done, _ = env.step(action)
 
-            if environment_used == "VizdoomBasic-v0":
-                next_state = preprocess(next_state[0], resolution)
-
             sumReward += reward
-                
-            # Add the interaction in memory
-            mem.pushMemory(actual_state, action, next_state, reward, done)
+            
+            if test_mode == False:
+                # Add the interaction in memory
+                mem.pushMemory(actual_state, action, next_state, reward, done)
+            
+                if batch_size <= len(mem.memoryReplay):
+                    # After we can learn
+                    sample_exp = mem.sample(batch_size)
+                    agent.opti_model(sample_exp, gamma, update_freq)
+
+                # Decrease the epsilon, at the beginning, the epsilon is high, so the agent will diversify its actions
+                # But at the end, the epsilon is low, so the agent will intensify.
+                if epsilon_start > epsilon_end :
+                    epsilon_start *= epsilon_decay
+
             actual_state = next_state
 
-            # Verify that the size of the sample is inferior than the size of the memory
-            if batch_size <= len(mem.memoryReplay):
-                # After we can learn
-                sample_exp = mem.sample(batch_size)
-                agent.opti_model(sample_exp, gamma, update_freq)
+            # Display render if we are in test_mode
+            if test_mode == True:
+                env.render()
 
             if done:
                 # Data to draw graphics
@@ -117,15 +118,14 @@ if __name__ == '__main__':
                 interaction = numpy.append(interaction, nbInteraction)
                 break
 
-            # Decrease the epsilon, at the beginning, the epsilon is high, so the agent will diversify its actions
-            # But at the end, the epsilon is low, so the agent will intensify.
-            if epsilon_start > epsilon_end :
-                epsilon_start *= epsilon_decay
-
             # Note there's no env.render() here. But the environment still can open window and
             # render if asked by env.monitor: it calls env.render('rgb_array') to record video.
             # Video is not recorded every episode, see capped_cubic_video_schedule for details.
     
+    # Save weights of the network used, decomment to save a new Neural Net
+    if test_mode == False:
+        torch.save(agent.net.state_dict(), "net/" + environment_used + ".pt")
+
     # Graphic reward per episode / episode
     pyplot.plot(ep, rewardPerEp)
     pyplot.gca().set_ylabel("Récompense totale")
@@ -133,12 +133,6 @@ if __name__ == '__main__':
     pyplot.title("Récompense totale par épisode")
     pyplot.show()
 
-    # Graphic total reward / nb interaction
-    pyplot.plot(interaction, rewardPerEp)
-    pyplot.gca().set_ylabel("Récompense totale")
-    pyplot.gca().set_xlabel("Nb Interaction")
-    pyplot.title("Récompense totale par rapport au nombre d'interaction")
-    pyplot.show()
 
     # Close the env and write monitor result info to disk
     env.close()

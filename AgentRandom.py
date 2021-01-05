@@ -6,13 +6,18 @@ import math
 
 class RandomAgent(object):
     """The world's simplest agent!"""
-    def __init__(self, action_space, ob_space, eta):
+    def __init__(self, action_space, ob_space, eta, test_mode, environment_used):
         self.action_space = action_space
         self.eta = eta
         self.steps_done = 0
 
         self.net = Network(ob_space.shape[0], [64, 64], action_space.n)
         self.target_net = Network(ob_space.shape[0], [64, 64], action_space.n)
+
+        # Load weights of the network from file (to test)
+        if test_mode:
+            self.net.load_state_dict(torch.load("net/" + environment_used + ".pt"))
+
         # Switch to "evaluate mode"
         self.net.eval()
         self.target_net.eval()
@@ -65,9 +70,9 @@ class RandomAgent(object):
         tmp_endsOfEp = numpy.vstack([exp.endOfEp for exp in sample_exp if exp is not None]).astype(numpy.uint8)
         endsOfEp = torch.from_numpy(tmp_endsOfEp).float()
 
-        loss_func = torch.nn.MSELoss(reduction="sum")
+        loss_func = torch.nn.MSELoss()
 
-        prediction = self.net(states).gather(1, actions)
+        prediction = self.net(states).gather(1, actions)    
         next_qval = self.target_net(next_states).detach().max(1)[0].unsqueeze(1)
 
         qval = rewards + (gamma * next_qval * (1 - endsOfEp))
